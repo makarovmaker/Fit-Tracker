@@ -255,8 +255,31 @@ img[data-pid]:not([src]){visibility:hidden}
 .chartbox svg{display:block;width:100%;height:auto;touch-action:pan-y}
 .chart-t{fill:var(--muted);font-size:10px;font-family:var(--font)}
 .pick.open{border-radius:14px 14px 0 0;border-bottom-color:transparent}
-.cfg{background:var(--surface);border:1px solid var(--accent);border-top:0;border-radius:0 0 14px 14px;padding:4px 12px 8px}
-.cfgrow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 0;font-weight:600;font-size:14px}
+.cfg{background:var(--surface);border:1px solid var(--accent);border-top:0;border-radius:0 0 14px 14px;padding:14px 12px 12px;display:flex;flex-direction:column;gap:14px}
+.cnote{font-size:13px;color:var(--muted);font-weight:600}
+.cmode .useg{padding:4px;border-radius:14px}
+.cmode .useg button{height:44px;font-size:15px;border-radius:11px}
+.cgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.cfld{display:flex;flex-direction:column;gap:6px;min-width:0}
+.cl{font-size:14px;font-weight:700}
+.crest{display:flex;gap:8px;align-items:stretch}
+.crest .bstep{flex:1}
+.crest .bseg{width:112px;flex:none;height:52px;box-sizing:border-box}
+.crest .bseg button{height:42px;font-size:15px}
+.bstep{display:flex;align-items:center;background:var(--surface2);border:1px solid var(--line);border-radius:14px;height:52px;min-width:0}
+.bstep button{width:48px;height:50px;display:grid;place-items:center;flex:none;color:var(--accent-text);text-align:center;border-radius:13px}
+.bstep button:active{background:var(--line)}
+.bstep input{flex:1;width:100%;min-width:0;border:0;background:none;text-align:center;font-weight:800;font-size:22px;outline:none;color:var(--fg)}
+.bstep input::placeholder{color:var(--fg);opacity:1;font-weight:800}
+.bseg{display:flex;background:var(--surface2);border:1px solid var(--line);border-radius:14px;padding:4px;gap:4px}
+.bseg button{flex:1;height:40px;border-radius:10px;font-size:16px;font-weight:700;color:var(--muted);text-align:center}
+.bseg button.on{background:var(--accent);color:var(--on-accent)}
+.cremb{display:flex;align-items:center;justify-content:space-between;gap:12px;text-align:left;min-height:60px;padding:8px 0;border-top:1px solid var(--line);font-weight:700;font-size:15px;width:100%}
+.cremb small{display:block;font-weight:500;font-size:12.5px;color:var(--muted);margin-top:2px}
+.cremb .sw{width:56px;height:32px}
+.cremb .sw::after{width:26px;height:26px}
+.cremb .sw.on::after{transform:translateX(24px)}
+.cdel{display:flex;align-items:center;justify-content:center;gap:8px;height:52px;border-radius:14px;border:1.5px solid var(--danger);color:var(--danger);font-weight:700;font-size:16px;width:100%}
 .cfgrow+.cfgrow{border-top:1px solid var(--line)}
 .cfgrow .r{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;min-width:0}
 .mini{display:flex;align-items:center;background:var(--surface2);border:1px solid var(--line);border-radius:12px}
@@ -779,16 +802,19 @@ function cfgSummary(c){
 function cfgPanel(a,i){
   var c=a.cfg[a.sel[i]];if(!c)return '';
   var dd=cfgDef(c);
-  var mini=function(f,val,label,ph){return '<div class="mini"><button data-act="cstep" data-i="'+i+'" data-f="'+f+'" data-d="-1" aria-label="'+label+': меньше">'+ic('minus',16)+'</button><input id="cfg-'+f+'-'+i+'" data-bind="cfg:'+f+'" data-i="'+i+'" value="'+esc(val)+'" placeholder="'+esc(ph)+'" inputmode="'+(f==='reps'?'text':'decimal')+'" aria-label="'+label+'"><button data-act="cstep" data-i="'+i+'" data-f="'+f+'" data-d="1" aria-label="'+label+': больше">'+ic('plus',16)+'</button></div>'};
+  var step=function(f,val,label,ph){return '<div class="bstep"><button data-act="cstep" data-i="'+i+'" data-f="'+f+'" data-d="-1" aria-label="'+label+': меньше">'+ic('minus',22)+'</button><input id="cfg-'+f+'-'+i+'" data-bind="cfg:'+f+'" data-i="'+i+'" value="'+esc(val)+'" placeholder="'+esc(ph)+'" inputmode="'+(f==='reps'?'text':'decimal')+'" aria-label="'+label+'"><button data-act="cstep" data-i="'+i+'" data-f="'+f+'" data-d="1" aria-label="'+label+': больше">'+ic('plus',22)+'</button></div>'};
+  var units=function(act,cur){return '<div class="bseg" role="group">'+['сек','мин'].map(function(u){return '<button class="'+(cur===u?'on':'')+'" data-act="'+act+'" data-i="'+i+'" data-v="'+u+'">'+u+'</button>'}).join('')+'</div>'};
   var second;
-  if(c.mode==='reps')second='<div class="cfgrow"><span>Повторения</span><div class="r">'+mini('reps',c.reps,'Повторения',dd.reps)+'</div></div>';
-  else if(c.mode==='time')second='<div class="cfgrow"><span>Время</span><div class="r">'+mini('amt',c.amt,'Время',dd.amt)+'<div class="useg">'+['сек','мин'].map(function(u){return '<button class="'+(c.tunit===u?'on':'')+'" data-act="ctunit" data-i="'+i+'" data-v="'+u+'">'+u+'</button>'}).join('')+'</div></div></div>';
-  else second='<div class="cfgrow"><span>Дистанция</span><div class="r">'+mini('amt',c.amt,'Дистанция',dd.amt)+'<span class="sub" style="font-weight:600">км</span></div></div>';
+  if(c.mode==='reps')second='<div class="cfld"><div class="cl">Повторения</div>'+step('reps',c.reps,'Повторения',dd.reps)+'</div>';
+  else if(c.mode==='time')second='<div class="cfld"><div class="cl">Время</div>'+step('amt',c.amt,'Время',dd.amt)+units('ctunit',c.tunit)+'</div>';
+  else second='<div class="cfld"><div class="cl">Дистанция, км</div>'+step('amt',c.amt,'Дистанция',dd.amt)+'</div>';
   var on=c.remember!==false;
-  return '<div class="cfg">'+(c.fromPreset?'<div class="sub" style="padding:6px 0 2px">Подставлены ваши сохранённые настройки</div>':'')+'<div class="cfgrow">'+modeSegHtml('cmode',c.mode,i)+'</div>'+
-    '<div class="cfgrow"><span>Подходы</span><div class="r">'+mini('sets',c.sets,'Подходы',dd.sets)+'</div></div>'+second+
-    '<div class="cfgrow"><span>Отдых</span><div class="r">'+mini('rest',c.rest===''?'':restDisp(c),'Отдых',restDisp({rest:c.def.rest,restUnit:c.restUnit}))+'<div class="useg">'+['сек','мин'].map(function(u){return '<button class="'+((c.restUnit||'сек')===u?'on':'')+'" data-act="cunit" data-i="'+i+'" data-v="'+u+'">'+u+'</button>'}).join('')+'</div></div></div>'+
-    '<div class="cfgrow"><span>Запомнить для следующих раз</span><button class="sw'+(on?' on':'')+'" data-act="cremember" data-i="'+i+'" role="switch" aria-checked="'+on+'" aria-label="Запомнить настройки"></button></div><div class="cfgrow"><button class="btn o" style="height:40px;font-size:14px;color:var(--danger)" data-act="cfgdel" data-i="'+i+'">Убрать из дня</button></div></div>';
+  return '<div class="cfg">'+(c.fromPreset?'<div class="cnote">Подставлены ваши сохранённые настройки</div>':'')+
+    '<div class="cmode">'+modeSegHtml('cmode',c.mode,i)+'</div>'+
+    '<div class="cgrid"><div class="cfld"><div class="cl">Подходы</div>'+step('sets',c.sets,'Подходы',dd.sets)+'</div>'+second+'</div>'+
+    '<div class="cfld cwide"><div class="cl">Отдых между подходами</div><div class="crest">'+step('rest',c.rest===''?'':restDisp(c),'Отдых',restDisp({rest:c.def.rest,restUnit:c.restUnit}))+units('cunit',c.restUnit||'сек')+'</div></div>'+
+    '<button class="cremb" data-act="cremember" data-i="'+i+'" role="switch" aria-checked="'+on+'"><span>Запомнить для следующих раз<small>Подставлю эти значения при добавлении упражнения</small></span><i class="sw'+(on?' on':'')+'"></i></button>'+
+    '<button class="cdel" data-act="cfgdel" data-i="'+i+'">'+ic('trash',20)+'Убрать из дня</button></div>';
 }
 screens.addday=function(){
   var a=U.add,list=exList();
@@ -1074,17 +1100,18 @@ function flowSteps(d){
 }
 function repsLabel(r){r=String(r);return /[^\d\s–-]/.test(r)?r:r+' повторений'}
 function timeSecs(e){var p=parseReps(e.reps),n=parseFloat(p.amt);if(isNaN(n))n=30;return Math.max(1,Math.round(n*(p.unit==='мин'?60:1)))}
+function flowBusy(){var n=Date.now();if(n-(U.flowAt||0)<500)return true;U.flowAt=n;return false}
 function completeSet(){
-  var s=S.session;if(!s)return;
+  var s=S.session;if(!s||s.resting)return;
   var d=getDay(s.dayId),st=flowSteps(d),cu=st[s.pos];if(!cu||cu.t!=='set')return;
-  sessTick();stopTimer();s.active=false;
-  s.done[cu.ex.id]=cu.n+1;
+  U.flowAt=Date.now();sessTick();stopTimer();s.active=false;
+  s.done[cu.ex.id]=Math.max(+s.done[cu.ex.id]||0,cu.n+1);
   var last=st[s.pos+1].t!=='set';
   if(!last&&cu.ex.rest>0){s.resting=true;startTimer(cu.ex.id,cu.ex.rest);s.restEnd=U.timer.endAt}
   else{s.pos++;s.resting=false}
   save();U.dir='from-r';render(false);
 }
-function advanceRest(){var s=S.session;if(!s)return;sessTick();stopTimer();s.resting=false;s.restEnd=null;s.pos++;save();U.dir='from-r';render(false)}
+function advanceRest(){var s=S.session;if(!s||!s.resting)return;U.flowAt=Date.now();sessTick();stopTimer();s.resting=false;s.restEnd=null;s.pos++;save();U.dir='from-r';render(false)}
 function flowTop(s,total,light){
   return '<div class="stop"><button class="ibtn" data-act="finish" aria-label="Выйти из тренировки">'+ic('close')+'</button><div class="grow"><div class="bar"><i style="width:'+(s.pos/(total-1)*100)+'%"></i></div></div><span class="sub num" style="min-width:52px;text-align:right">'+(s.pos+1)+' / '+total+'</span></div>';
 }
@@ -1093,6 +1120,10 @@ screens.flow=function(){
   if(!d)return '<div class="scene"><div class="empty">Тренировка не начата</div></div>';
   var st=flowSteps(d);if(s.pos==null)s.pos=Math.min(1+sessDone(s),st.length-1);
   s.pos=Math.min(s.pos,st.length-1);
+  if(!s.resting&&st[s.pos].t==='set'){/* позиция всегда на первом невыполненном подходе: ни один подход не может быть перескочен */
+    var fi=-1;for(var q=0;q<st.length;q++){if(st[q].t==='set'&&(+s.done[st[q].ex.id]||0)<=st[q].n){fi=q;break}}
+    if(fi>=0&&fi!==s.pos){s.pos=fi;s.active=false;save()}
+  }
   if(s.resting&&!U.timer&&s.restEnd&&s.restEnd<=Date.now()){s.resting=false;s.restEnd=null;s.pos=Math.min(s.pos+1,st.length-1);save()}
   var cu=st[s.pos],total=st.length,top=flowTop(s,total);
   if(cu.t==='before'||cu.t==='after'){
@@ -1391,7 +1422,7 @@ var A={
   finish2:function(){closeSheet();finishWorkout()},
   cancelwk:function(){closeSheet();S.session=null;save();stopTimer();back();toast('Тренировка отменена')},
   /* timer */
-  setdone:function(){completeSet()},
+  setdone:function(){if(flowBusy())return;completeSet()},
   ready:function(){
     var s=S.session;if(!s)return;
     var st=flowSteps(getDay(s.dayId)),cu=st[s.pos];if(!cu||cu.t!=='set')return;
@@ -1399,7 +1430,7 @@ var A={
     s.active=true;startTimer(cu.ex.id,timeSecs(cu.ex));
     render(false);
   },
-  restskip:function(){advanceRest()},
+  restskip:function(){if(flowBusy())return;advanceRest()},
   photonext:function(){
     var s=S.session;if(!s)return;
     var st=flowSteps(getDay(s.dayId));
