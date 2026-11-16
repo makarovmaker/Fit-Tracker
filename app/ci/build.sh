@@ -11,7 +11,8 @@ M=android/app/src/main/AndroidManifest.xml
 sed -i 's#<application#<uses-permission android:name="android.permission.CAMERA" />\n    <uses-permission android:name="android.permission.VIBRATE" />\n    <application#' "$M"
 sed -i 's#<activity#<activity android:screenOrientation="portrait"#' "$M"
 sed -i 's#<application#<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />\n    <application#' "$M"
-grep -n "screenOrientation\|CAMERA\|VIBRATE\|NOTIFICATIONS\|EXACT_ALARM" "$M"
+sed -i 's#<application#<uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />\n    <application#' "$M"
+grep -n "screenOrientation\|CAMERA\|VIBRATE\|NOTIFICATIONS\|EXACT_ALARM\|INSTALL_PACKAGES" "$M"
 
 # Иконка и заставка из папки assets
 BG='#0C5026'
@@ -28,6 +29,36 @@ for D in ci/icons/*/; do
   mkdir -p "$R0/$N"
   cp "$D/ic_launcher.png" "$D/ic_launcher_round.png" "$R0/$N/"
 done
+
+# Обновление внутри приложения: свой плагин скачивает APK и открывает установщик (без браузера)
+MA=$(find android/app/src/main/java -name MainActivity.java | head -n 1)
+[ -n "$MA" ] || { echo "MainActivity.java не найден"; exit 1; }
+PD=$(dirname "$MA")
+cp ci/native/ApkInstallerPlugin.java "$PD/ApkInstallerPlugin.java"
+cat > "$MA" <<'JAVA'
+package com.fittracker.app;
+
+import android.os.Bundle;
+import com.getcapacitor.BridgeActivity;
+
+public class MainActivity extends BridgeActivity {
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        registerPlugin(ApkInstallerPlugin.class);
+        super.onCreate(savedInstanceState);
+    }
+}
+JAVA
+mkdir -p android/app/src/main/res/xml
+cat > android/app/src/main/res/xml/file_paths.xml <<'XML'
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <external-path name="my_images" path="." />
+    <cache-path name="my_cache_images" path="." />
+    <files-path name="my_files" path="." />
+</paths>
+XML
+grep -n "fileprovider" "$M" || true
 
 # Системная заставка Android без логотипа: остаётся только анимированная
 R=android/app/src/main/res

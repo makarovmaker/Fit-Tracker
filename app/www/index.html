@@ -1790,11 +1790,30 @@ var FT_BUILD=0;var FT_REPO='';
         var a=(j.assets||[]).filter(function(x){return /\.apk$/i.test(x.name||'')})[0];
         url=a?a.browser_download_url:(j.html_url||'https://github.com/'+FT_REPO+'/releases/latest');
         if(!manual){if(S.session&&S.session.active)return;if($('#layer').firstChild)return}
-        sheet('<h3>Доступно обновление</h3><div class="sub" style="margin-bottom:14px;text-align:justify;hyphens:auto;-webkit-hyphens:auto">Вышла новая версия приложения. Ваши данные сохранятся. После скачивания откройте файл и подтвердите установку.</div><div class="col" style="gap:8px"><button class="btn" data-act="updgo">Скачать обновление</button><button class="btn o" data-act="updlater" data-n="'+n+'">Позже</button></div>');
+        sheet('<h3>Доступно обновление</h3><div class="sub" style="margin-bottom:14px;text-align:justify;hyphens:auto;-webkit-hyphens:auto">Вышла новая версия приложения. Ваши данные сохранятся. Нажмите «Обновить»: приложение скачает файл само и откроет установку, останется только подтвердить.</div><div class="col" style="gap:8px"><button class="btn" data-act="updgo">Обновить</button><button class="btn o" data-act="updlater" data-n="'+n+'">Позже</button></div>');
       }).catch(function(){clearTimeout(to);msg('Не удалось связаться с GitHub. Проверьте интернет',manual)});
   }
   A.updcheck=function(){closeSheet();check(true)};
-  A.updgo=function(){closeSheet();render(true);try{window.open(url,'_blank')}catch(e){location.href=url}};
+  A.updgo=function(){
+    var C=window.Capacitor,P=null;
+    try{if(C&&C.registerPlugin&&C.isPluginAvailable&&C.isPluginAvailable('ApkInstaller'))P=C.registerPlugin('ApkInstaller')}catch(e){}
+    var browser=function(){closeSheet();render(true);try{window.open(url,'_blank')}catch(e){location.href=url}};
+    if(!P||!/\.apk(\?|$)/i.test(url||'')){browser();return}
+    var body=function(msg,pct,btns){return '<h3>Обновление</h3><div class="sub" style="margin-bottom:14px;text-align:justify" id="upd-msg">'+msg+'</div>'+(pct==null?'':'<div style="height:10px;border-radius:6px;background:var(--surface2);border:1px solid var(--line);overflow:hidden;margin-bottom:14px"><div id="upd-bar" style="height:100%;width:'+pct+'%;background:var(--accent);transition:width .2s"></div></div>')+(btns||'')};
+    sheet(body('Скачиваю обновление…',0,''));
+    try{P.addListener('progress',function(e){var p=Math.max(0,Math.min(100,+e.percent||0));var bar=document.getElementById('upd-bar'),m=document.getElementById('upd-msg');if(bar)bar.style.width=p+'%';if(m)m.textContent='Скачиваю обновление… '+p+'%'})}catch(e){}
+    P.install({url:url}).then(function(){
+      closeSheet();render(true);
+    }).catch(function(e){
+      var code=e&&e.code;
+      if(code==='NEED_PERMISSION'){
+        sheet(body('Чтобы установить обновление, разрешите Fit Tracker устанавливать приложения: включите переключатель на открывшейся странице, вернитесь назад и нажмите «Обновить» ещё раз.',null,'<div class="col" style="gap:8px"><button class="btn" data-act="updgo">Обновить</button><button class="btn o" data-act="updlater" data-n="0">Отмена</button></div>'));
+      }else{
+        sheet(body('Не удалось скачать обновление внутри приложения. Проверьте интернет и попробуйте ещё раз.',null,'<div class="col" style="gap:8px"><button class="btn" data-act="updgo">Повторить</button><button class="btn o" data-act="updbrowser">Скачать через браузер</button><button class="btn o" data-act="updlater" data-n="0">Позже</button></div>'));
+      }
+    });
+  };
+  A.updbrowser=function(){closeSheet();render(true);try{window.open(url,'_blank')}catch(e){location.href=url}};
   A.updlater=function(el){var n=+(el&&el.dataset&&el.dataset.n)||0;var st=rd();st.skip=n;wr(st);closeSheet();render(true)};
   setTimeout(function(){check(false,true)},4000);
   document.addEventListener('visibilitychange',function(){if(!document.hidden)setTimeout(function(){check(false)},1500)});
