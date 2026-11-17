@@ -279,6 +279,21 @@ img[data-pid]:not([src]){visibility:hidden}
 .cremb .sw{width:56px;height:32px}
 .cremb .sw::after{width:26px;height:26px}
 .cremb .sw.on::after{transform:translateX(24px)}
+.rkbtn{display:block;width:100%;text-align:left}
+.rkmore{display:flex;align-items:center;justify-content:center;gap:2px;margin-top:8px;color:var(--accent-text);font-weight:700;font-size:14px}
+.rstep{display:flex;gap:14px;align-items:flex-start;min-height:76px}
+.rrail{display:flex;flex-direction:column;align-items:center;align-self:stretch;width:34px;flex:none}
+.rdot{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;flex:none;font-weight:800;font-size:15px;background:var(--surface2);border:2px solid var(--line);color:var(--muted)}
+.rstep.ok .rdot{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.rstep.cur .rdot{box-shadow:0 0 0 4px var(--accent-soft,rgba(34,179,94,.25))}
+.rline{flex:1;width:4px;border-radius:2px;background:var(--line);margin:4px 0;position:relative;overflow:hidden;min-height:30px}
+.rline i{position:absolute;left:0;top:0;width:100%;background:var(--accent);border-radius:2px}
+.rbody{flex:1;min-width:0;padding:2px 0 14px}
+.rname{font-weight:800;font-size:17px}
+.rstep:not(.ok) .rname{color:var(--muted)}
+.rtag{font-size:12.5px;font-weight:700;color:var(--accent-text);padding-top:6px;white-space:nowrap}
+.rtag.lock{color:var(--muted);font-weight:600}
+.rtag.now{background:var(--accent);color:var(--on-accent);border-radius:8px;padding:4px 8px;margin-top:2px}
 .cdel{display:flex;align-items:center;justify-content:center;gap:8px;height:52px;border-radius:14px;border:1.5px solid var(--danger);color:var(--danger);font-weight:700;font-size:16px;width:100%}
 .cfgrow+.cfgrow{border-top:1px solid var(--line)}
 .cfgrow .r{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;min-width:0}
@@ -698,10 +713,29 @@ screens.program=function(){
     var di=iso(d),list=all.filter(function(x){return x.date===di});
     if(list.length)list.forEach(function(x){rows.push(dayRow(x))});else rows.push(freeRow(di));
   }
-  return hdr({title:'Моя программа'})+
-  '<div class="col">'+rows.join('')+'</div>';
+  /* прошлые дни: выполненные тренировки из журнала и пропущенные дни программы */
+  var past=[],logDays={};
+  S.log.forEach(function(l){if(l.date<t){past.push({date:l.date,k:'log',l:l});logDays[l.dayId]=1}});
+  all.forEach(function(d){if(d.date<t&&d.exercises.length&&!logDays[d.id]&&!S.log.some(function(l){return l.date===d.date}))past.push({date:d.date,k:'skip',d:d})});
+  past.sort(function(a,b){return a.date<b.date?-1:a.date>b.date?1:0});
+  var ph='',pm='';
+  past.forEach(function(p){
+    var d=fromIso(p.date),ym=p.date.slice(0,7);
+    if(ym!==pm){pm=ym;ph+='<div class="h2" style="margin:8px 2px 0">'+MN[d.getMonth()]+' '+d.getFullYear()+'</div>'}
+    if(p.k==='log'){var l=p.l;
+      ph+='<button class="item" data-act="go" data-to="histday" data-id="'+l.id+'"><span class="thumb">'+ic('k_body',24)+'</span><span class="grow"><div class="t">'+dayLabel(l.date)+'</div><div class="s">'+esc(l.name||'Тренировка')+' · '+l.sets+' '+pl(l.sets,['подход','подхода','подходов'])+' · '+fmtDur(l.min)+'</div></span><span class="badge">'+ic('check',13)+'</span><span class="chev">'+ic('chev',20)+'</span></button>';
+    }else ph+=dayRow(p.d);
+  });
+  var pastHtml=past.length?'<div class="col" id="pastdays" style="margin-bottom:6px"><div class="sub" style="padding:0 2px;font-weight:700">Прошлые дни · '+past.length+'</div>'+ph+'<div class="sub" style="text-align:center;padding:6px 0 2px">Дальше — ваша программа ↓</div></div>':'';
+  return pastHtml+hdr({title:'Моя программа'})+
+  '<div class="col" id="progrows">'+rows.join('')+'</div>';
 };
-mounts.program=function(){};
+mounts.program=function(){
+  /* при входе экран прокручен так, чтобы прошлые дни были выше: достаточно потянуть вниз */
+  if(!U.fresh)return;
+  var sc=$('#screen'),pd=$('#pastdays');
+  if(sc&&pd){sc.scrollTop=pd.offsetHeight+parseFloat(getComputedStyle(pd).marginBottom||0)}
+};
 
 function exSub(e){return (modeOf(e.reps)!=='reps'&&+e.sets===1)?esc(e.reps):e.sets+' '+pl(e.sets,['подход','подхода','подходов'])+' · '+esc(e.reps)}
 screens.day=function(p){
@@ -956,6 +990,20 @@ screens.photos=function(){
   '<section class="card"><h2>Прогресс</h2><div class="mrow" style="border-top:0;padding-top:0"><span></span><span class="sub" style="text-align:center">До</span><span class="sub" style="text-align:center">После</span><span></span></div>'+row('weight','Вес','кг')+row('waist','Талия','см')+row('chest','Грудь','см')+'</section></div>';
 };
 
+screens.ranks=function(){
+  var rk=rank(),xp=S.xp||0,top=RANKS[RANKS.length-1][1];
+  var steps=RANKS.map(function(r,i){
+    var nx=RANKS[i+1],reached=xp>=r[1],isCur=i===rk.idx;
+    var fill=!nx?0:(xp>=nx[1]?100:(isCur?rk.pct:0));
+    var st=isCur?'<span class="rtag now">Вы здесь</span>':(reached?'<span class="rtag">Пройдено</span>':'<span class="rtag lock">ещё '+(r[1]-xp)+' XP</span>');
+    return '<div class="rstep'+(reached?' ok':'')+(isCur?' cur':'')+'"><div class="rrail"><span class="rdot">'+(reached&&!isCur?ic('check',16):(i+1))+'</span>'+(nx?'<span class="rline"><i style="height:'+fill+'%"></i></span>':'')+'</div>'+
+      '<div class="rbody"><div class="rname">'+esc(r[0])+'</div><div class="sub num">'+(i===0?'Старт':'от '+fmtN(r[1])+' XP')+'</div>'+(isCur&&nx?'<div class="sub" style="margin-top:2px">До «'+esc(nx[0])+'»: <b class="num">'+rk.left+' XP</b></div>':'')+'</div>'+st+'</div>';
+  }).join('');
+  var all=Math.min(100,xp/top*100);
+  return hdr({back:true,title:'Путь по XP'})+'<div class="col"><section class="card"><div class="row" style="justify-content:space-between;align-items:baseline"><div><div class="sub">Сейчас</div><div class="h2" style="margin:0">'+esc(rk.name)+'</div></div><div style="text-align:right"><div class="sub">Всего XP</div><div class="h2 num" style="margin:0">'+fmtN(xp)+'</div></div></div>'+
+    '<div class="bar" style="margin-top:12px" role="progressbar" aria-valuenow="'+Math.round(all)+'" aria-valuemax="100"><i style="width:'+all+'%"></i></div><div class="row" style="justify-content:space-between;margin-top:4px"><span class="sub">0</span><span class="sub num">'+(xp>=top?'Вершина достигнута':'Вершина: '+fmtN(top)+' XP · осталось '+fmtN(top-xp))+'</span></div></section>'+
+    '<section class="card" style="padding-bottom:6px">'+steps+'</section></div>';
+};
 screens.history=function(){
   var list=S.log.slice().sort(function(a,b){return a.date<b.date?1:a.date>b.date?-1:0}),html='',cm='';
   list.forEach(function(l){
@@ -991,7 +1039,7 @@ screens.profile=function(){
   var rk=rank(),ac=achievements(),n=ac.filter(function(a){return a.ok}).length,show=U.showAll?ac:ac.slice(0,8),lw=lastWeight();
   var kv=function(ico,k,v,act,extra){return '<button class="kv" data-act="'+act+'" '+(extra||'')+'><span style="color:var(--accent-text)">'+ic(ico,20)+'</span><span class="k">'+k+'</span><span class="v">'+v+'</span><span class="chev">'+ic('chev',16)+'</span></button>'};
   return hdr({titleHtml:'<div class="row grow" style="gap:14px"><button class="avwrap" data-act="avatar" aria-label="Изменить аватар"><span class="avatar">'+(S.avatar?'<img src="'+S.avatar+'" alt="Аватар">':esc((S.name||'?').charAt(0).toUpperCase()))+'</span><span class="avcam">'+ic('camera',13)+'</span></button><span class="grow" style="min-width:0"><div style="font-size:21px;font-weight:800;letter-spacing:-.01em;overflow-wrap:anywhere">'+esc(S.name)+'</div><div style="color:var(--accent-text);font-weight:700;font-size:14px">'+esc(rk.name)+'</div></span></div>',right:gear})+
-  '<div class="col"><div><div class="bar" role="progressbar" aria-valuenow="'+Math.round(rk.pct)+'" aria-valuemax="100"><i style="width:'+rk.pct+'%"></i></div><div class="row" style="justify-content:space-between;margin-top:4px"><span class="sub num">'+rk.xp+' XP</span><span class="sub">'+(rk.next?'до «'+esc(rk.nextName)+'»: '+rk.left+' XP':'Высшее звание')+'</span></div></div>'+
+  '<div class="col"><button class="rkbtn" data-act="go" data-to="ranks" aria-label="Весь путь по XP"><div class="bar" role="progressbar" aria-valuenow="'+Math.round(rk.pct)+'" aria-valuemax="100"><i style="width:'+rk.pct+'%"></i></div><div class="row" style="justify-content:space-between;margin-top:4px"><span class="sub num">'+rk.xp+' XP</span><span class="sub">'+(rk.next?'до «'+esc(rk.nextName)+'»: '+rk.left+' XP':'Высшее звание')+'</span></div><div class="rkmore">Весь путь по XP '+ic('chev',16)+'</div></button>'+
   '<section class="card"><div class="row" style="justify-content:space-between"><h2 style="margin:0">Достижения</h2><button class="link" data-act="toggleach">'+(U.showAll?'Свернуть':'Все')+'</button></div><div style="font-size:22px;font-weight:800;margin:4px 0 12px" class="num">'+n+' <span class="sub" style="font-weight:500;font-size:13px">из '+ac.length+'</span></div>'+
     '<div class="ach">'+show.map(function(a,ix){return '<button class="a'+(a.ok?'':' lock')+'" data-act="achinfo" data-i="'+ix+'"><span class="thumb">'+ic(a.i,26)+'</span>'+esc(a.t)+'</button>'}).join('')+'</div></section>'+
   '<section class="card" style="padding-bottom:4px"><h2>Мои данные</h2>'+
@@ -1001,13 +1049,13 @@ screens.profile=function(){
 
 /* ---------- render ---------- */
 var TABS=[['home','Главная','home'],['program','Программа','program'],['stats','Статистика','stats'],['profile','Профиль','user']];
-var TABMAP={home:'home',program:'program',day:'program',stats:'stats',calendar:'stats',profile:'profile',photos:'profile'};
+var TABMAP={ranks:'profile',home:'home',program:'program',day:'program',stats:'stats',calendar:'stats',profile:'profile',photos:'profile'};
 var NOTAB={done:1,exercise:1,timer:1,addday:1,workout:1,flow:1,onboard:1};
 function cur(){return U.stack[U.stack.length-1]}
 function render(keep){
   var r=cur(),sc=$('#screen'),key=r.name+JSON.stringify(r.p||{});
   if(r.name==='flow'&&S.session)key+=':'+S.session.pos+(S.session.resting?'r':'')+(S.session.active?'a':'');
-  var prev=(keep&&U.lastKey===key)?sc.scrollTop:0;
+  var prev=(keep&&U.lastKey===key)?sc.scrollTop:0;U.fresh=!(keep&&U.lastKey===key);
   sc.classList.toggle('flowmode',r.name==='flow');
   sc.innerHTML=screens[r.name](r.p||{});
   sc.scrollTop=prev;
