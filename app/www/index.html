@@ -713,23 +713,34 @@ screens.program=function(){
     var di=iso(d),list=all.filter(function(x){return x.date===di});
     if(list.length)list.forEach(function(x){rows.push(dayRow(x))});else rows.push(freeRow(di));
   }
-  /* прошлые дни: выполненные тренировки из журнала и пропущенные дни программы */
-  var past=[],logDays={};
-  S.log.forEach(function(l){if(l.date<t){past.push({date:l.date,k:'log',l:l});logDays[l.dayId]=1}});
-  all.forEach(function(d){if(d.date<t&&d.exercises.length&&!logDays[d.id]&&!S.log.some(function(l){return l.date===d.date}))past.push({date:d.date,k:'skip',d:d})});
-  past.sort(function(a,b){return a.date<b.date?-1:a.date>b.date?1:0});
-  var ph='',pm='';
-  past.forEach(function(p){
-    var d=fromIso(p.date),ym=p.date.slice(0,7);
-    if(ym!==pm){pm=ym;ph+='<div class="h2" style="margin:8px 2px 0">'+MN[d.getMonth()]+' '+d.getFullYear()+'</div>'}
-    if(p.k==='log'){var l=p.l;
-      ph+='<button class="item" data-act="go" data-to="histday" data-id="'+l.id+'"><span class="thumb">'+ic('k_body',24)+'</span><span class="grow"><div class="t">'+dayLabel(l.date)+'</div><div class="s">'+esc(l.name||'Тренировка')+' · '+l.sets+' '+pl(l.sets,['подход','подхода','подходов'])+' · '+fmtDur(l.min)+'</div></span><span class="badge">'+ic('check',13)+'</span><span class="chev">'+ic('chev',20)+'</span></button>';
-    }else ph+=dayRow(p.d);
-  });
-  var pastHtml=past.length?'<div class="col" id="pastdays" style="margin-bottom:6px"><div class="sub" style="padding:0 2px;font-weight:700">Прошлые дни · '+past.length+'</div>'+ph+'<div class="sub" style="text-align:center;padding:6px 0 2px">Дальше — ваша программа ↓</div></div>':'';
+  /* прошлые дни: каждая дата от начала использования до вчера, такими же ячейками, как будущие */
+  ensureSince();
+  function restRow(di){
+    return '<div class="item" style="background:transparent;border-style:dashed;cursor:default"><span class="thumb" style="background:var(--surface2);color:var(--muted)">'+ic('minus',22)+'</span>'+
+      '<span class="grow"><div class="t">'+dayLabel(di)+'</div><div class="s">Нет тренировки</div></span></div>';
+  }
+  function doneRow(l){
+    return '<button class="item" data-act="go" data-to="histday" data-id="'+l.id+'"><span class="thumb">'+ic('k_body',24)+'</span><span class="grow"><div class="t">'+dayLabel(l.date)+'</div><div class="s">'+esc(l.name||'Тренировка')+' · '+l.sets+' '+pl(l.sets,['подход','подхода','подходов'])+' · '+fmtDur(l.min)+'</div></span><span class="badge">'+ic('check',13)+'</span><span class="chev">'+ic('chev',20)+'</span></button>';
+  }
+  var pr=[],cnt=0;
+  for(var pd=fromIso(S.since),pe=addDays(fromIso(t),-1);pd<=pe&&cnt<400;pd=addDays(pd,1),cnt++){
+    var pi=iso(pd),logs=S.log.filter(function(l){return l.date===pi}),prog=all.filter(function(x){return x.date===pi});
+    if(logs.length)logs.forEach(function(l){pr.push(doneRow(l))});
+    var doneIds={};logs.forEach(function(l){doneIds[l.dayId]=1});
+    var left=prog.filter(function(x){return !doneIds[x.id]&&x.exercises.length&&!logs.length});
+    left.forEach(function(x){pr.push(dayRow(x))});
+    if(!logs.length&&!left.length)pr.push(restRow(pi));
+  }
+  var pastHtml=pr.length?'<div class="col" id="pastdays" style="margin-bottom:14px">'+pr.join('')+'</div>':'';
   return pastHtml+hdr({title:'Моя программа'})+
   '<div class="col" id="progrows">'+rows.join('')+'</div>';
 };
+function ensureSince(){
+  var t=todayIso(),m=t;
+  S.log.forEach(function(l){if(l.date&&l.date<m)m=l.date});
+  S.program.days.forEach(function(d){if(d.date&&d.date<m)m=d.date});
+  if(!S.since||!/^\d{4}-\d{2}-\d{2}$/.test(S.since)||S.since>m){S.since=m;try{save()}catch(e){}}
+}
 mounts.program=function(){
   /* при входе экран прокручен так, чтобы прошлые дни были выше: достаточно потянуть вниз */
   if(!U.fresh)return;
@@ -1815,6 +1826,7 @@ var FT_BUILD=0;var FT_REPO='';
   function rd(){try{return JSON.parse(localStorage.getItem(K))||{}}catch(e){return {}}}
   function wr(o){try{localStorage.setItem(K,JSON.stringify(o))}catch(e){}}
   function msg(m,manual){if(manual)toast(m)}
+  function inAppOk(){try{var C=window.Capacitor;return !!(NATIVE&&C&&C.isPluginAvailable&&C.isPluginAvailable('ApkInstaller'))}catch(e){return false}}
   function check(manual,force){
     if(!NATIVE){msg('Проверка работает только в установленном приложении',manual);return}
     if(!(FT_BUILD>0)||!FT_REPO){msg('Эта сборка без номера: обновления не проверяются',manual);return}
@@ -1838,13 +1850,13 @@ var FT_BUILD=0;var FT_REPO='';
         var a=(j.assets||[]).filter(function(x){return /\.apk$/i.test(x.name||'')})[0];
         url=a?a.browser_download_url:(j.html_url||'https://github.com/'+FT_REPO+'/releases/latest');
         if(!manual){if(S.session&&S.session.active)return;if($('#layer').firstChild)return}
-        sheet('<h3>Доступно обновление</h3><div class="sub" style="margin-bottom:14px;text-align:justify;hyphens:auto;-webkit-hyphens:auto">Вышла новая версия приложения. Ваши данные сохранятся. Нажмите «Обновить»: приложение скачает файл само и откроет установку, останется только подтвердить.</div><div class="col" style="gap:8px"><button class="btn" data-act="updgo">Обновить</button><button class="btn o" data-act="updlater" data-n="'+n+'">Позже</button></div>');
+        sheet('<h3>Доступно обновление</h3><div class="sub" style="margin-bottom:14px;text-align:justify;hyphens:auto;-webkit-hyphens:auto">Вышла новая версия приложения. Ваши данные сохранятся. Нажмите «Обновить»: приложение скачает файл само и откроет установку, останется только подтвердить.</div><div class="sub" style="font-size:12px;margin:-6px 0 12px;opacity:.75">'+(inAppOk()?'Установка прямо в приложении':'В этой версии файл скачивается через браузер')+'</div><div class="col" style="gap:8px"><button class="btn" data-act="updgo">Обновить</button><button class="btn o" data-act="updlater" data-n="'+n+'">Позже</button></div>');
       }).catch(function(){clearTimeout(to);msg('Не удалось связаться с GitHub. Проверьте интернет',manual)});
   }
   A.updcheck=function(){closeSheet();check(true)};
   A.updgo=function(){
     var C=window.Capacitor,P=null;
-    try{if(C&&C.registerPlugin&&C.isPluginAvailable&&C.isPluginAvailable('ApkInstaller'))P=C.registerPlugin('ApkInstaller')}catch(e){}
+    try{if(NATIVE&&C&&C.registerPlugin)P=C.registerPlugin('ApkInstaller')}catch(e){}
     var browser=function(){closeSheet();render(true);try{window.open(url,'_blank')}catch(e){location.href=url}};
     if(!P||!/\.apk(\?|$)/i.test(url||'')){browser();return}
     var body=function(msg,pct,btns){return '<h3>Обновление</h3><div class="sub" style="margin-bottom:14px;text-align:justify" id="upd-msg">'+msg+'</div>'+(pct==null?'':'<div style="height:10px;border-radius:6px;background:var(--surface2);border:1px solid var(--line);overflow:hidden;margin-bottom:14px"><div id="upd-bar" style="height:100%;width:'+pct+'%;background:var(--accent);transition:width .2s"></div></div>')+(btns||'')};
@@ -1854,6 +1866,7 @@ var FT_BUILD=0;var FT_REPO='';
       closeSheet();render(true);
     }).catch(function(e){
       var code=e&&e.code;
+      if(code==='UNIMPLEMENTED'||/not implemented|not available/i.test(String(e&&e.message||''))){browser();return}
       if(code==='NEED_PERMISSION'){
         sheet(body('Чтобы установить обновление, разрешите Fit Tracker устанавливать приложения: включите переключатель на открывшейся странице, вернитесь назад и нажмите «Обновить» ещё раз.',null,'<div class="col" style="gap:8px"><button class="btn" data-act="updgo">Обновить</button><button class="btn o" data-act="updlater" data-n="0">Отмена</button></div>'));
       }else{
