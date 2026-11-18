@@ -1792,7 +1792,20 @@ render(false);
 
 /* native extras (Capacitor): notification when timer ends in background, Android back button */
 var NATIVE=(function(){try{return window.Capacitor&&Capacitor.isNativePlatform&&Capacitor.isNativePlatform()}catch(e){return false}})();
-function LN(){try{return window.Capacitor&&Capacitor.Plugins&&Capacitor.Plugins.LocalNotifications}catch(e){return null}}
+/* В APK нет JS-ядра Capacitor (нет Capacitor.Plugins / registerPlugin), поэтому нативные плагины зовём напрямую через мост */
+function CAPP(name){
+  try{
+    var C=window.Capacitor;if(!C)return null;
+    if(C.Plugins&&C.Plugins[name])return C.Plugins[name];
+    if(!NATIVE||!C.nativePromise)return null;
+    return new Proxy({},{get:function(_,m){
+      if(m==='then'||typeof m!=='string')return undefined;
+      if(m==='addListener')return function(ev,cb){try{return Promise.resolve(C.addListener(name,ev,cb))}catch(e){return Promise.reject(e)}};
+      return function(o){return C.nativePromise(name,m,o||{})};
+    }});
+  }catch(e){return null}
+}
+function LN(){return CAPP('LocalNotifications')}
 function syncNotify(){
   var ln=LN();if(!NATIVE||!ln)return;
   try{
@@ -1808,7 +1821,7 @@ document.addEventListener('visibilitychange',function(){syncNotify();if(!documen
 (function(){
   var ln=LN();
   if(NATIVE&&ln){try{ln.requestPermissions()}catch(e){}}
-  var App=null;try{App=window.Capacitor&&Capacitor.Plugins&&Capacitor.Plugins.App}catch(e){}
+  var App=NATIVE?CAPP('App'):null;
   if(!App||!App.addListener)return;
   App.addListener('backButton',function(){
     if($('#layer').firstChild){closeSheet();return}
@@ -1826,7 +1839,7 @@ var FT_BUILD=0;var FT_REPO='';
   function rd(){try{return JSON.parse(localStorage.getItem(K))||{}}catch(e){return {}}}
   function wr(o){try{localStorage.setItem(K,JSON.stringify(o))}catch(e){}}
   function msg(m,manual){if(manual)toast(m)}
-  function inAppOk(){try{var C=window.Capacitor;return !!(NATIVE&&C&&C.isPluginAvailable&&C.isPluginAvailable('ApkInstaller'))}catch(e){return false}}
+  function inAppOk(){return !!(NATIVE&&CAPP('ApkInstaller'))}
   function check(manual,force){
     if(!NATIVE){msg('Проверка работает только в установленном приложении',manual);return}
     if(!(FT_BUILD>0)||!FT_REPO){msg('Эта сборка без номера: обновления не проверяются',manual);return}
@@ -1855,8 +1868,8 @@ var FT_BUILD=0;var FT_REPO='';
   }
   A.updcheck=function(){closeSheet();check(true)};
   A.updgo=function(){
-    var C=window.Capacitor,P=null;
-    try{if(NATIVE&&C&&C.registerPlugin)P=C.registerPlugin('ApkInstaller')}catch(e){}
+    var P=null;
+    try{if(NATIVE)P=CAPP('ApkInstaller')}catch(e){}
     var browser=function(){closeSheet();render(true);try{window.open(url,'_blank')}catch(e){location.href=url}};
     if(!P||!/\.apk(\?|$)/i.test(url||'')){browser();return}
     var body=function(msg,pct,btns){return '<h3>Обновление</h3><div class="sub" style="margin-bottom:14px;text-align:justify" id="upd-msg">'+msg+'</div>'+(pct==null?'':'<div style="height:10px;border-radius:6px;background:var(--surface2);border:1px solid var(--line);overflow:hidden;margin-bottom:14px"><div id="upd-bar" style="height:100%;width:'+pct+'%;background:var(--accent);transition:width .2s"></div></div>')+(btns||'')};
