@@ -732,7 +732,7 @@ screens.program=function(){
     if(!logs.length&&!left.length)pr.push(restRow(pi));
   }
   var pastHtml=pr.length?'<div class="col" id="pastdays" style="margin-bottom:14px">'+pr.join('')+'</div>':'';
-  return pastHtml+hdr({title:'Моя программа'})+
+  return hdr({title:'Моя программа'})+pastHtml+
   '<div class="col" id="progrows">'+rows.join('')+'</div>';
 };
 function ensureSince(){
